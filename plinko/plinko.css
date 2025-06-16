@@ -11,7 +11,7 @@ body {
 }
 
 #game-container {
-    max-width: 600px;
+    max-width: 800px; /* Increased from 600px */
     background-color: #fff;
     padding: 20px;
     border-radius: 8px;
@@ -20,8 +20,8 @@ body {
 }
 
 #plinko-board {
-    width: 500px;
-    height: 400px;
+    width: 700px; /* Increased from 500px */
+    height: 600px; /* Increased from 400px */
     border: 2px solid #333;
     position: relative;
     margin: 20px auto;
