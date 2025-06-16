@@ -4,11 +4,12 @@
 window.plinkoGameApi = {};
 
 // --- Constants and Variables ---
-const PEG_ROWS = 10;
-const PEGS_PER_ROW_START = 7;
+// Adjusted for larger board (700x600px)
+const PEG_ROWS = 15; // Increased from 10
+const PEGS_PER_ROW_START = 10; // Increased from 7
 const PEG_SIZE = 10; // px
-const PEG_SPACING_HORIZONTAL = 60; // px
-const PEG_SPACING_VERTICAL = 35; // px
+const PEG_SPACING_HORIZONTAL = 60; // px (kept same)
+const PEG_SPACING_VERTICAL = 35; // px (kept same)
 const BALL_SIZE = 20; // px
 const BALL_START_OFFSET_Y = - (PEG_SPACING_VERTICAL / 2);
 
@@ -30,8 +31,8 @@ let ballVX, ballVY;
 let isDropping = false;
 let animationFrameId = null;
 
-// Prize values - made accessible for testing determinePrize
-const PRIZE_VALUES = [10, 25, 5, 50, 10, 25, 5]; // Ensure enough values if slots change
+// Prize values - updated to 13 slots, representing multipliers
+const PRIZE_VALUES = [33, 11, 4, 2, 1.1, 0.6, 0.3, 0.6, 1.1, 2, 4, 11, 33];
 
 
 // --- Sound Effect Placeholders ---
@@ -222,28 +223,40 @@ function updateGameInternal() {
 function determinePrizeInternal(finalBallX) {
     // Use the passed finalBallX for prize determination
     const currentBoardWidth = boardElement ? boardElement.clientWidth : 500; // Use actual or default
-    const prizeSlotsCount = boardElement ? document.querySelectorAll('#prize-slots .prize-slot').length : 5;
+    const prizeSlotsCount = boardElement ? document.querySelectorAll('#prize-slots .prize-slot').length : PRIZE_VALUES.length;
     const slotWidth = currentBoardWidth / prizeSlotsCount;
-    const slotIndex = Math.min(Math.floor(finalBallX / slotWidth), prizeSlotsCount - 1);
+    // Ensure slotIndex is within bounds of the PRIZE_VALUES array
+    const slotIndex = Math.max(0, Math.min(Math.floor(finalBallX / slotWidth), prizeSlotsCount - 1));
 
-    const wonAmount = PRIZE_VALUES[slotIndex % PRIZE_VALUES.length];
+    const prizeMultiplier = PRIZE_VALUES[slotIndex];
+    const wonAmount = Math.round(COST_TO_PLAY * prizeMultiplier); // Calculate actual points won
 
     playerScore += wonAmount;
     if(scoreDisplay) updateScoreDisplayInternal();
 
     if (messageDisplay) {
-        if (wonAmount > 0) {
-            messageDisplay.textContent = `Congratulations! You won ${wonAmount} points!`;
+        // Distinguish between actual win, break-even (e.g. x1 multiplier), or loss
+        if (prizeMultiplier > 1) {
+            messageDisplay.textContent = `Congratulations! You won ${wonAmount} points (x${prizeMultiplier})!`;
             messageDisplay.style.color = "blue";
             playSound_winPrize();
-        } else {
+        } else if (prizeMultiplier === 1) {
+            messageDisplay.textContent = `You got your ${COST_TO_PLAY} points back (x1).`;
+            messageDisplay.style.color = "green";
+            // playSound_neutral or playSound_losePrize could be used
+            playSound_losePrize();
+        } else if (prizeMultiplier > 0) { // Won something, but less than cost
+             messageDisplay.textContent = `You won ${wonAmount} points (x${prizeMultiplier}).`;
+            messageDisplay.style.color = "orange";
+            playSound_losePrize();
+        } else { // Multiplier is 0 or less (though current array is all positive)
             messageDisplay.textContent = "No prize this time. Better luck next drop!";
             messageDisplay.style.color = "orange";
             playSound_losePrize();
         }
     }
-    // console.log(`Ball landed at X: ${finalBallX.toFixed(2)}, slot: ${slotIndex + 1}, won: ${wonAmount}`);
-    return wonAmount; // Return for testing
+    // console.log(`Ball landed at X: ${finalBallX.toFixed(2)}, slot: ${slotIndex + 1}, multiplier: ${prizeMultiplier}, won: ${wonAmount}`);
+    return wonAmount; // Return for testing (actual points won)
 }
 
 function updateScoreDisplayInternal() {

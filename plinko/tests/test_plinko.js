@@ -104,30 +104,45 @@ function runPlinkoTests() {
     // --- Test Prize Determination (Simplified) ---
     testResultsDiv.innerHTML += '<h4>Prize Determination Tests:</h4>';
     const prizeValues = initialState.PRIZE_VALUES;
-    const numSlots = document.querySelectorAll('#prize-slots .prize-slot').length || 5; // Match game logic
-    const mockBoardWidth = 500; // Must match what determinePrizeInternal expects or uses by default
+    const numSlots = document.querySelectorAll('#prize-slots .prize-slot').length || initialState.PRIZE_VALUES.length; // Use PRIZE_VALUES.length as fallback
+    const mockBoardWidth = 700; // Updated to match new board width and test_runner.html mock
 
     // Test landing in first slot
     window.plinkoGameApi.setPlayerScore(100); // Reset score
+    const costToPlay = initialState.COST_TO_PLAY;
     let ballX_slot1 = (mockBoardWidth / numSlots) * 0.5; // Middle of first slot
-    let prize1 = window.plinkoGameApi.determinePrize(ballX_slot1);
-    assertEquals(prizeValues[0], prize1, `Prize for slot 1 (X=${ballX_slot1.toFixed(0)}) should be ${prizeValues[0]}`);
-    assertEquals(100 + prizeValues[0], window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for prize 1");
+    let wonAmount1 = window.plinkoGameApi.determinePrize(ballX_slot1);
+    let expectedWonAmount1 = Math.round(costToPlay * prizeValues[0]);
+    assertEquals(expectedWonAmount1, wonAmount1, `Points for slot 1 (multiplier ${prizeValues[0]}, X=${ballX_slot1.toFixed(0)}) should be ${expectedWonAmount1}`);
+    assertEquals(100 + expectedWonAmount1, window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for prize 1");
 
-    // Test landing in third slot
+    // Test landing in third slot (multiplier prizeValues[2])
     window.plinkoGameApi.setPlayerScore(100); // Reset score
     let ballX_slot3 = (mockBoardWidth / numSlots) * 2.5; // Middle of third slot
-    let prize3 = window.plinkoGameApi.determinePrize(ballX_slot3);
+    let wonAmount3 = window.plinkoGameApi.determinePrize(ballX_slot3);
     const expectedPrizeIndex = 2; // 0-indexed
-    assertEquals(prizeValues[expectedPrizeIndex], prize3, `Prize for slot 3 (X=${ballX_slot3.toFixed(0)}) should be ${prizeValues[expectedPrizeIndex]}`);
-    assertEquals(100 + prizeValues[expectedPrizeIndex], window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for prize 3");
+    let expectedWonAmount3 = Math.round(costToPlay * prizeValues[expectedPrizeIndex]);
+    assertEquals(expectedWonAmount3, wonAmount3, `Points for slot 3 (multiplier ${prizeValues[expectedPrizeIndex]}, X=${ballX_slot3.toFixed(0)}) should be ${expectedWonAmount3}`);
+    assertEquals(100 + expectedWonAmount3, window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for prize 3");
 
-    // Test landing at the very edge (last slot)
+    // Test landing at the very edge (last slot, multiplier prizeValues[numSlots-1])
     window.plinkoGameApi.setPlayerScore(100);
     let ballX_lastSlot = mockBoardWidth - 1; // Almost at the very end, should be last slot
-    let prizeLast = window.plinkoGameApi.determinePrize(ballX_lastSlot);
-    assertEquals(prizeValues[numSlots - 1], prizeLast, `Prize for last slot (X=${ballX_lastSlot}) should be ${prizeValues[numSlots-1]}`);
-    assertEquals(100 + prizeValues[numSlots - 1], window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for last prize slot");
+    let wonAmountLast = window.plinkoGameApi.determinePrize(ballX_lastSlot);
+    let expectedWonAmountLast = Math.round(costToPlay * prizeValues[numSlots - 1]);
+    assertEquals(expectedWonAmountLast, wonAmountLast, `Points for last slot (multiplier ${prizeValues[numSlots-1]}, X=${ballX_lastSlot}) should be ${expectedWonAmountLast}`);
+    assertEquals(100 + expectedWonAmountLast, window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for last prize slot");
+
+    // Test a slot with a fractional multiplier (e.g., 0.3, which is PRIZE_VALUES[6])
+    // Assuming numSlots is 13, slot index 6 is the 7th slot.
+    if (numSlots === 13 && prizeValues.length === 13) {
+        window.plinkoGameApi.setPlayerScore(100);
+        let ballX_slot7 = (mockBoardWidth / numSlots) * 6.5; // Middle of 7th slot (index 6)
+        let wonAmount7 = window.plinkoGameApi.determinePrize(ballX_slot7);
+        let expectedWonAmount7 = Math.round(costToPlay * prizeValues[6]);
+        assertEquals(expectedWonAmount7, wonAmount7, `Points for slot 7 (multiplier ${prizeValues[6]}, X=${ballX_slot7.toFixed(0)}) should be ${expectedWonAmount7}`);
+        assertEquals(100 + expectedWonAmount7, window.plinkoGameApi.getGameState().playerScore, "Score should update correctly for slot 7 (fractional multiplier)");
+    }
 
 
     // --- Test Ball Reset ---
