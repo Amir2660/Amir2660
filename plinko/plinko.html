@@ -1,47 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plinko Game</title>
+    <title>Plinko Casino Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="plinko.css">
 </head>
+
 <body>
-    <div id="game-container">
-        <div id="plinko-board">
-            <!-- Pegs will be added here by JavaScript -->
+    <!-- Modal for Bet Selection -->
+    <div id="modal-overlay" class="hidden"></div>
+    <div id="bet-modal" class="hidden">
+        <h2>Select Bet Amount</h2>
+        <div id="predefined-bets">
+            <button class="bet-option" data-amount="1">1</button><button class="bet-option"
+                data-amount="2">2</button><button class="bet-option" data-amount="5">5</button><button
+                class="bet-option" data-amount="10">10</button><button class="bet-option"
+                data-amount="20">20</button><button class="bet-option" data-amount="50">50</button><button
+                class="bet-option" data-amount="100">100</button>
         </div>
-        <div id="ball"></div>
-        <div id="prize-slots">
-            <div class="prize-slot">x33</div>
-            <div class="prize-slot">x11</div>
-            <div class="prize-slot">x4</div>
-            <div class="prize-slot">x2</div>
-            <div class="prize-slot">x1.1</div>
-            <div class="prize-slot">x0.6</div>
-            <div class="prize-slot">x0.3</div>
-            <div class="prize-slot">x0.6</div>
-            <div class="prize-slot">x1.1</div>
-            <div class="prize-slot">x2</div>
-            <div class="prize-slot">x4</div>
-            <div class="prize-slot">x11</div>
-            <div class="prize-slot">x33</div>
-        </div>
-        <div id="score-display">Score: 0</div>
-        <div id="message-display"></div>
-        <button id="drop-ball-button">Drop Ball</button>
+        <div class="custom-bet-container"><label for="custom-bet-input">Custom Amount:</label><input type="number"
+                id="custom-bet-input" placeholder="e.g., 25"></div>
+        <button id="confirm-bet-button">Set Bet</button><button id="close-modal-button">×</button>
     </div>
 
-    <!--
-        Placeholder audio elements.
-        Actual sound files (e.g., .wav, .mp3) would need to be created and placed in a 'sounds' directory.
-        These are commented out to prevent browser errors if files are missing.
-    <audio id="audio-ball-drop" src="sounds/ball_drop.wav" preload="auto"></audio>
-    <audio id="audio-peg-hit" src="sounds/peg_hit.wav" preload="auto"></audio>
-    <audio id="audio-win-prize" src="sounds/win_prize.mp3" preload="auto"></audio>
-    <audio id="audio-lose-prize" src="sounds/lose_prize.wav" preload="auto"></audio>
-    -->
+    <!-- Main Game Wrapper -->
+    <div id="game-wrapper">
+        <header class="game-header">
+            <h1>
+                PLINKO
+                <img src="image/logoMap.png" alt="Your Logo" width="90" height="90">
+            </h1>
+            <img src="image/logoMap.png" alt="Your Logo" width="80" height="80">
+            <div id="balance-display">Balance: 300</div>
+        </header>
 
+
+        <div id="main-content">
+            <!-- Left Panel for Controls -->
+            <div id="left-panel">
+                <div class="controls-container">
+                    <div class="bet-info" id="bet-selector">
+                        <span>Bet Amount</span>
+                        <span id="bet-amount-display">10</span>
+                    </div>
+                    <div class="risk-buttons-container">
+                        <button id="bet-button-low" class="bet-risk-button" data-risk="low">Low Risk</button>
+                        <button id="bet-button-medium" class="bet-risk-button" data-risk="medium">Medium Risk</button>
+                        <button id="bet-button-high" class="bet-risk-button" data-risk="high">High Risk</button>
+                    </div>
+                    <div id="message-display">Choose your risk and bet!</div>
+                </div>
+            </div>
+
+            <!-- Right Panel for the Game -->
+            <div id="right-panel">
+                <div id="logo-container">
+                    <source src="image/logoMap.png" alt="Your Logo">
+                </div>
+                <div id="game-container">
+                    <!-- The board is now the main component with prizes inside -->
+                    <div id="plinko-board">
+                        <!-- This is the new area for pegs and ball physics -->
+                        <div id="peg-area">
+                            <div id="ball"></div>
+                        </div>
+                        <!-- Prize rows are now INSIDE the board -->
+                        <div id="prize-rows-container">
+                            <div id="prize-row-low" class="prize-row"></div>
+                            <div id="prize-row-medium" class="prize-row"></div>
+                            <div id="prize-row-high" class="prize-row"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="plinko.js"></script>
 </body>
+
 </html>
