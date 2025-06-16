@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plinko Game</title>
+    <link rel="stylesheet" href="plinko.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="plinko-board">
+            <!-- Pegs will be added here by JavaScript -->
+        </div>
+        <div id="ball"></div>
+        <div id="prize-slots">
+            <div class="prize-slot">Prize 1</div>
+            <div class="prize-slot">Prize 2</div>
+            <div class="prize-slot">Prize 3</div>
+            <div class="prize-slot">Prize 4</div>
+            <div class="prize-slot">Prize 5</div>
+        </div>
+        <div id="score-display">Score: 0</div>
+        <div id="message-display"></div>
+        <button id="drop-ball-button">Drop Ball</button>
+    </div>
+
+    <!--
+        Placeholder audio elements.
+        Actual sound files (e.g., .wav, .mp3) would need to be created and placed in a 'sounds' directory.
+        These are commented out to prevent browser errors if files are missing.
+    <audio id="audio-ball-drop" src="sounds/ball_drop.wav" preload="auto"></audio>
+    <audio id="audio-peg-hit" src="sounds/peg_hit.wav" preload="auto"></audio>
+    <audio id="audio-win-prize" src="sounds/win_prize.mp3" preload="auto"></audio>
+    <audio id="audio-lose-prize" src="sounds/lose_prize.wav" preload="auto"></audio>
+    -->
+
+    <script src="plinko.js"></script>
+</body>
+</html>

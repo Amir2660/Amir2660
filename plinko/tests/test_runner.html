@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Plinko Game Tests</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #test-results { border: 1px solid #ccc; padding: 10px; }
+        .pass { color: green; }
+        .fail { color: red; font-weight: bold; }
+        .summary { margin-top: 10px; font-weight: bold; }
+        h3 { margin-top: 15px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Plinko Game Unit Tests</h1>
+    <div id="test-results">
+        <!-- Test results will be appended here -->
+    </div>
+
+    <script>
+        // Set a flag to indicate a test environment.
+        // plinko.js can use this to avoid auto-initializing for the browser.
+        window.isRunningTests = true;
+    </script>
+
+    <!-- Game script - load before tests. -->
+    <script src="../plinko.js"></script>
+
+    <!-- Test script -->
+    <script src="test_plinko.js"></script>
+
+    <script>
+        // Run tests after everything is loaded
+        window.onload = () => {
+            // test_plinko.js will call plinkoGameApi.initGameForTest()
+            runPlinkoTests();
+        };
+    </script>
+
+    <!-- Mock HTML elements required by plinko.js for it to run without error, even if not visible -->
+    <div id="game-container" style="display: none;">
+        <div id="plinko-board" style="width: 500px; height: 400px;"></div>
+        <div id="ball"></div>
+        <div id="prize-slots">
+            <div class="prize-slot">1</div>
+            <div class="prize-slot">2</div>
+            <div class="prize-slot">3</div>
+            <div class="prize-slot">4</div>
+            <div class="prize-slot">5</div>
+        </div>
+        <div id="score-display"></div>
+        <div id="message-display"></div>
+        <button id="drop-ball-button"></button>
+    </div>
+
+</body>
+</html>
