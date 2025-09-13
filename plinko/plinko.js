@@ -1,39 +1,37 @@
 // JavaScript for Plinko game logic
 
-// Expose a namespace for testing or direct interaction if needed
-window.plinkoGameApi = {};
-
 // --- Constants and Variables ---
-// Adjusted for larger board (700x600px)
-const PEG_ROWS = 15; // Increased from 10
-const PEGS_PER_ROW_START = 10; // Increased from 7
-const PEG_SIZE = 10; // px
-const PEG_SPACING_HORIZONTAL = 60; // px (kept same)
-const PEG_SPACING_VERTICAL = 35; // px (kept same)
-const BALL_SIZE = 20; // px
-const BALL_START_OFFSET_Y = - (PEG_SPACING_VERTICAL / 2);
+const PEG_ROWS = 14;
+const PEG_SIZE = 10;
+const PEG_SPACING_HORIZONTAL = 48;
+const PEG_SPACING_VERTICAL = 38;
+const BALL_SIZE = 18;
+const BALL_START_OFFSET_Y = 15;
 
 const GRAVITY = 0.15;
 const HORIZONTAL_FRICTION = 0.99;
 const PEG_BOUNCE_HORIZONTAL_SPEED = 3;
 const PEG_BOUNCE_VERTICAL_DAMPING = 0.7;
-const MIN_PRIZE_FOR_WIN_SOUND = 25;
-const COST_TO_PLAY = 10;
 
-// HTML Element References - will be initialized in initGame
-let boardElement, ballElement, dropButton, scoreDisplay, messageDisplay;
+// --- HTML Element References ---
+let boardElement, pegAreaElement, ballElement, balanceDisplay, messageDisplay, betSelector, betAmountDisplay;
+let betModal, modalOverlay, predefinedBetsContainer, customBetInput, confirmBetButton, closeModalButton;
+let riskButtons;
 
-// Game State
-let playerScore = 100; // Default, can be reset
+// --- Game State ---
+let playerBalance = 300;
+let betAmount = 10;
 let pegs = [];
-let ballX, ballY;
-let ballVX, ballVY;
+let ballX, ballY, ballVX, ballVY;
 let isDropping = false;
 let animationFrameId = null;
-
-// Prize values - updated to 13 slots, representing multipliers
-const PRIZE_VALUES = [33, 11, 4, 2, 1.1, 0.6, 0.3, 0.6, 1.1, 2, 4, 11, 33];
-
+let currentRiskLevel = 'low';
+const PRIZE_DATA = {
+    low: [18, 3.2, 1.6, 1.3, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.3, 1.6, 3.2, 18],
+    medium: [55, 12, 5.6, 3.2, 1.6, 1, 0.7, 0.2, 0.7, 1, 1.6, 3.2, 5.6, 12, 55],
+    high: [353, 49, 14, 5.3, 2.1, 0.5, 0.2, 0, 0.2, 0.5, 2.1, 5.3, 14, 49, 353]
+};
+const PRIZE_SLOT_COUNT = 15;
 
 // --- Sound Effect Placeholders ---
 function playSound_ballDrop() { console.log("DEBUG: Play ball drop sound"); }
@@ -41,155 +39,124 @@ function playSound_pegHit() { console.log("DEBUG: Play peg hit sound"); }
 function playSound_winPrize() { console.log("DEBUG: Play win prize sound"); }
 function playSound_losePrize() { console.log("DEBUG: Play lose prize / neutral sound"); }
 
-// --- Core Logic Functions (Internal - can be called by game or tests) ---
+// --- Core Logic Functions ---
 
 function initializeDomReferences() {
     boardElement = document.getElementById('plinko-board');
+    pegAreaElement = document.getElementById('peg-area');
     ballElement = document.getElementById('ball');
-    dropButton = document.getElementById('drop-ball-button');
-    scoreDisplay = document.getElementById('score-display');
+    riskButtons = document.querySelectorAll('.bet-risk-button');
+    balanceDisplay = document.getElementById('balance-display');
     messageDisplay = document.getElementById('message-display');
+    betSelector = document.getElementById('bet-selector');
+    betAmountDisplay = document.getElementById('bet-amount-display');
+    betModal = document.getElementById('bet-modal');
+    modalOverlay = document.getElementById('modal-overlay');
+    predefinedBetsContainer = document.getElementById('predefined-bets');
+    customBetInput = document.getElementById('custom-bet-input');
+    confirmBetButton = document.getElementById('confirm-bet-button');
+    closeModalButton = document.getElementById('close-modal-button');
+}
+
+function createPrizeSlots() {
+    for (const risk in PRIZE_DATA) {
+        const rowElement = document.getElementById(`prize-row-${risk}`);
+        rowElement.innerHTML = '';
+        PRIZE_DATA[risk].forEach(multiplier => {
+            const slot = document.createElement('div');
+            slot.classList.add('prize-slot', `${risk}-risk`);
+            slot.textContent = multiplier;
+            rowElement.appendChild(slot);
+        });
+    }
 }
 
 function createPegsInternal() {
-    if (!boardElement) {
-        console.error("Board element not initialized for peg creation.");
-        return;
-    }
-    boardElement.innerHTML = '';
+    if (!pegAreaElement) return;
+    pegAreaElement.innerHTML = '';
+    pegAreaElement.appendChild(ballElement);
     pegs = [];
-    const boardWidth = boardElement.clientWidth;
+    const boardWidth = pegAreaElement.clientWidth;
 
     for (let row = 0; row < PEG_ROWS; row++) {
-        const pegsInThisRow = PEGS_PER_ROW_START + (row % 2 === 0 ? 0 : 1);
+        const pegsInThisRow = 2 + row;
         const totalRowWidth = (pegsInThisRow - 1) * PEG_SPACING_HORIZONTAL;
-        let startX = (boardWidth - totalRowWidth) / 2;
-
-        if (row % 2 !== 0) {
-            startX -= PEG_SPACING_HORIZONTAL / 2;
-        }
-        startX = Math.max(startX, PEG_SPACING_HORIZONTAL / 2);
-
+        const startX = (boardWidth - totalRowWidth) / 2;
         for (let col = 0; col < pegsInThisRow; col++) {
             const pegElement = document.createElement('div');
             pegElement.classList.add('peg');
-            pegElement.style.width = `${PEG_SIZE}px`;
-            pegElement.style.height = `${PEG_SIZE}px`;
-            pegElement.style.backgroundColor = 'grey';
-            pegElement.style.borderRadius = '50%';
-            pegElement.style.position = 'absolute';
-
+            pegElement.style.cssText = `width:${PEG_SIZE}px; height:${PEG_SIZE}px; border-radius:50%; position:absolute;`;
             const pegCenterX = startX + col * PEG_SPACING_HORIZONTAL;
-            const pegCenterY = (row + 1) * PEG_SPACING_VERTICAL;
-
-            if (pegCenterX - PEG_SIZE / 2 >= 0 && pegCenterX + PEG_SIZE / 2 <= boardWidth) {
-                pegElement.style.left = `${pegCenterX - PEG_SIZE / 2}px`;
-                pegElement.style.top = `${pegCenterY - PEG_SIZE / 2}px`;
-                boardElement.appendChild(pegElement);
-                pegs.push({
-                    element: pegElement,
-                    x: pegCenterX,
-                    y: pegCenterY,
-                    radius: PEG_SIZE / 2
-                });
-            }
+            // <<< THIS IS THE CORRECTED LINE >>>
+            const pegCenterY = (row + 2) * PEG_SPACING_VERTICAL; // Changed from (row + 3) back to (row + 2)
+            pegElement.style.left = `${pegCenterX - PEG_SIZE / 2}px`;
+            pegElement.style.top = `${pegCenterY - PEG_SIZE / 2}px`;
+            pegAreaElement.appendChild(pegElement);
+            pegs.push({ element: pegElement, x: pegCenterX, y: pegCenterY, radius: PEG_SIZE / 2 });
         }
     }
-    return pegs.length; // Return peg count for testing
 }
 
 function resetBallInternal(wasDropped = false) {
-    if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-    }
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
     isDropping = false;
-
-    if (!boardElement || !ballElement || !messageDisplay || !dropButton) {
-        console.warn("DOM elements not fully available for resetBallInternal. Skipping some operations.");
-        // In a pure test environment without DOM, some of this might not run.
-    }
-
-    const boardWidth = boardElement ? boardElement.clientWidth : 500; // Default for testing
+    if (!pegAreaElement || !ballElement) return;
+    const boardWidth = pegAreaElement.clientWidth;
     ballX = boardWidth / 2;
     ballY = BALL_START_OFFSET_Y;
-
-    if (ballElement) {
-        ballElement.style.left = `${ballX - BALL_SIZE / 2}px`;
-        ballElement.style.top = `${ballY - BALL_SIZE / 2}px`;
-    }
-
+    ballElement.style.left = `${ballX - BALL_SIZE / 2}px`;
+    ballElement.style.top = `${ballY - BALL_SIZE / 2}px`;
     if (messageDisplay && !wasDropped) {
-        messageDisplay.textContent = "Ready to drop!";
-        messageDisplay.style.color = "green";
+        messageDisplay.textContent = "Choose your risk and bet!";
+        messageDisplay.style.color = "var(--text-light)";
     }
-    if (dropButton) dropButton.disabled = false;
+    riskButtons.forEach(button => button.disabled = false);
 }
 
 function dropBallInternal() {
     if (isDropping) return false;
-
-    if (playerScore < COST_TO_PLAY) {
-        if (messageDisplay) {
-            messageDisplay.textContent = `Not enough points! Need ${COST_TO_PLAY}.`;
-            messageDisplay.style.color = "red";
-        }
-        return false; // Indicate drop failed
+    if (playerBalance < betAmount) {
+        messageDisplay.textContent = `Not enough balance! Need ${betAmount}.`;
+        messageDisplay.style.color = "var(--accent-red)";
+        return false;
     }
-
-    if (messageDisplay) {
-        messageDisplay.textContent = "Ball dropped!";
-        messageDisplay.style.color = "green";
-    }
-
-    playerScore -= COST_TO_PLAY;
-    if(scoreDisplay) updateScoreDisplayInternal(); // Update display if available
-
+    messageDisplay.textContent = "Good luck!";
+    messageDisplay.style.color = "var(--primary-teal)";
+    playerBalance -= betAmount;
+    updateBalanceDisplayInternal();
     playSound_ballDrop();
-
     isDropping = true;
-    if (dropButton) dropButton.disabled = true;
-
-    const boardWidth = boardElement ? boardElement.clientWidth : 500;
-    ballX = boardWidth / 2 + (Math.random() - 0.5) * PEG_SPACING_HORIZONTAL / 3;
+    riskButtons.forEach(button => button.disabled = true);
+    const boardWidth = pegAreaElement.clientWidth;
+    ballX = boardWidth / 2 + (Math.random() - 0.5) * 10;
     ballY = BALL_START_OFFSET_Y;
-    ballVY = 0.5;
+    ballVY = 1.0;
     ballVX = (Math.random() - 0.5) * 2;
-
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    // In a non-browser test environment, requestAnimationFrame won't run.
-    // For testing game logic, we might need to call updateGameInternal manually or mock raf.
-    if (typeof window !== 'undefined' && window.requestAnimationFrame) {
-        updateGameInternal();
-    }
-    return true; // Indicate drop succeeded
+    updateGameInternal();
+    return true;
 }
 
 function updateGameInternal() {
     if (!isDropping) return;
-
     ballVY += GRAVITY;
     ballY += ballVY;
     ballVX *= HORIZONTAL_FRICTION;
     ballX += ballVX;
-
-    const boardWidth = boardElement ? boardElement.clientWidth : 500;
+    const boardWidth = pegAreaElement.clientWidth;
     const ballRadius = BALL_SIZE / 2;
-
     if (ballX - ballRadius < 0) {
         ballX = ballRadius;
-        ballVX *= -1;
+        ballVX *= -0.8;
     } else if (ballX + ballRadius > boardWidth) {
         ballX = boardWidth - ballRadius;
-        ballVX *= -1;
+        ballVX *= -0.8;
     }
-
     for (const peg of pegs) {
         const dx = ballX - peg.x;
         const dy = ballY - peg.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const combinedRadii = ballRadius + peg.radius;
-
         if (distance < combinedRadii) {
             playSound_pegHit();
             const normDX = dx / distance;
@@ -198,137 +165,117 @@ function updateGameInternal() {
             ballX += normDX * overlap * 0.6;
             ballY += normDY * overlap * 0.6;
             ballVY *= -PEG_BOUNCE_VERTICAL_DAMPING;
-            ballVX = normDX * PEG_BOUNCE_HORIZONTAL_SPEED + (Math.random() -0.5) * 0.5;
-            if (Math.abs(ballVY) < 0.5 && dy < 0) ballVY = -1.5;
+            ballVX = normDX * PEG_BOUNCE_HORIZONTAL_SPEED + (Math.random() - 0.5) * 0.5;
+            if (Math.abs(ballVY) < 1.0 && dy < 0) ballVY = -1.5;
             break;
         }
     }
+    ballElement.style.left = `${ballX - ballRadius}px`;
+    ballElement.style.top = `${ballY - ballRadius}px`;
 
-    if (ballElement) {
-        ballElement.style.left = `${ballX - ballRadius}px`;
-        ballElement.style.top = `${ballY - ballRadius}px`;
-    }
-
-    const boardHeight = boardElement ? boardElement.clientHeight : 400;
-    if (ballY + ballRadius > boardHeight) {
+    const boardHeight = pegAreaElement.clientHeight;
+    if (ballY - ballRadius > boardHeight) {
         isDropping = false;
-        determinePrizeInternal(ballX); // Pass current ballX
+        determinePrizeInternal(ballX);
         resetBallInternal(true);
         return;
     }
-
     animationFrameId = requestAnimationFrame(updateGameInternal);
 }
 
 function determinePrizeInternal(finalBallX) {
-    // Use the passed finalBallX for prize determination
-    const currentBoardWidth = boardElement ? boardElement.clientWidth : 500; // Use actual or default
-    const prizeSlotsCount = boardElement ? document.querySelectorAll('#prize-slots .prize-slot').length : PRIZE_VALUES.length;
-    const slotWidth = currentBoardWidth / prizeSlotsCount;
-    // Ensure slotIndex is within bounds of the PRIZE_VALUES array
-    const slotIndex = Math.max(0, Math.min(Math.floor(finalBallX / slotWidth), prizeSlotsCount - 1));
+    const currentBoardWidth = pegAreaElement.clientWidth;
+    const slotWidth = currentBoardWidth / PRIZE_SLOT_COUNT;
+    const slotIndex = Math.max(0, Math.min(Math.floor(finalBallX / slotWidth), PRIZE_SLOT_COUNT - 1));
+    const prizeMultiplier = PRIZE_DATA[currentRiskLevel][slotIndex];
+    const wonAmount = Math.round(betAmount * prizeMultiplier);
 
-    const prizeMultiplier = PRIZE_VALUES[slotIndex];
-    const wonAmount = Math.round(COST_TO_PLAY * prizeMultiplier); // Calculate actual points won
-
-    playerScore += wonAmount;
-    if(scoreDisplay) updateScoreDisplayInternal();
+    playerBalance += wonAmount;
+    updateBalanceDisplayInternal();
 
     if (messageDisplay) {
-        // Distinguish between actual win, break-even (e.g. x1 multiplier), or loss
-        if (prizeMultiplier > 1) {
-            messageDisplay.textContent = `Congratulations! You won ${wonAmount} points (x${prizeMultiplier})!`;
-            messageDisplay.style.color = "blue";
+        if (wonAmount > betAmount) {
+            messageDisplay.textContent = `You won ${wonAmount}! (x${prizeMultiplier})`;
+            messageDisplay.style.color = "var(--accent-green)";
             playSound_winPrize();
-        } else if (prizeMultiplier === 1) {
-            messageDisplay.textContent = `You got your ${COST_TO_PLAY} points back (x1).`;
-            messageDisplay.style.color = "green";
-            // playSound_neutral or playSound_losePrize could be used
+        } else if (wonAmount > 0) {
+            messageDisplay.textContent = `You got ${wonAmount} back. (x${prizeMultiplier})`;
+            messageDisplay.style.color = "var(--accent-orange)";
             playSound_losePrize();
-        } else if (prizeMultiplier > 0) { // Won something, but less than cost
-             messageDisplay.textContent = `You won ${wonAmount} points (x${prizeMultiplier}).`;
-            messageDisplay.style.color = "orange";
-            playSound_losePrize();
-        } else { // Multiplier is 0 or less (though current array is all positive)
-            messageDisplay.textContent = "No prize this time. Better luck next drop!";
-            messageDisplay.style.color = "orange";
+        } else {
+            messageDisplay.textContent = "No prize this time. Better luck next time!";
+            messageDisplay.style.color = "var(--accent-red)";
             playSound_losePrize();
         }
     }
-    // console.log(`Ball landed at X: ${finalBallX.toFixed(2)}, slot: ${slotIndex + 1}, multiplier: ${prizeMultiplier}, won: ${wonAmount}`);
-    return wonAmount; // Return for testing (actual points won)
 }
 
-function updateScoreDisplayInternal() {
-    if (scoreDisplay) {
-        scoreDisplay.textContent = `Score: ${playerScore}`;
-    }
+function updateBalanceDisplayInternal() {
+    if (balanceDisplay) balanceDisplay.textContent = `Balance: ${playerBalance}`;
+}
+
+function updateActiveRiskDisplay(risk) {
+    document.querySelectorAll('.prize-row').forEach(row => row.classList.remove('active'));
+    document.getElementById(`prize-row-${risk}`).classList.add('active');
+}
+
+function setupControls() {
+    betSelector.addEventListener('click', () => {
+        betModal.classList.remove('hidden');
+        modalOverlay.classList.remove('hidden');
+        customBetInput.value = betAmount;
+    });
+    const closeModal = () => {
+        betModal.classList.add('hidden');
+        modalOverlay.classList.add('hidden');
+    };
+    closeModalButton.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', closeModal);
+    predefinedBetsContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('bet-option')) {
+            customBetInput.value = parseInt(e.target.dataset.amount, 10);
+        }
+    });
+    confirmBetButton.addEventListener('click', () => {
+        const customAmount = parseInt(customBetInput.value, 10);
+        if (!isNaN(customAmount) && customAmount > 0) {
+            betAmount = customAmount;
+            betAmountDisplay.textContent = betAmount;
+            closeModal();
+        } else {
+            alert("Please enter a valid, positive number for your bet.");
+        }
+    });
+    riskButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            currentRiskLevel = e.target.dataset.risk;
+            updateActiveRiskDisplay(currentRiskLevel);
+            dropBallInternal();
+        });
+        button.addEventListener('mouseover', (e) => { if (!isDropping) updateActiveRiskDisplay(e.target.dataset.risk); });
+        button.addEventListener('mouseout', () => { if (!isDropping) updateActiveRiskDisplay(currentRiskLevel); });
+    });
 }
 
 function initGame() {
-    initializeDomReferences(); // Get actual DOM elements
-    if (!boardElement) { // If critical elements are missing, don't proceed
-        console.error("Plinko board HTML elements not found. Game cannot initialize.");
-        if(messageDisplay) messageDisplay.textContent = "Error: Game elements missing!";
-        return;
-    }
+    initializeDomReferences();
+    if (!boardElement) return;
+    createPrizeSlots();
+    setupControls();
     createPegsInternal();
     resetBallInternal();
-    updateScoreDisplayInternal();
-    if (dropButton) dropButton.addEventListener('click', dropBallInternal);
+    updateBalanceDisplayInternal();
+    betAmountDisplay.textContent = betAmount;
+    updateActiveRiskDisplay(currentRiskLevel);
 
-    // Resize listener for actual game play
-    if (typeof window !== 'undefined') {
-        window.addEventListener('resize', () => {
-            if (isDropping) {
-                cancelAnimationFrame(animationFrameId);
-                animationFrameId = null;
-                isDropping = false;
-            }
-            createPegsInternal(); // Recreate pegs with new dimensions
-            resetBallInternal(); // Reset ball position
-        });
-    }
+    window.addEventListener('resize', () => {
+        if (isDropping) {
+            cancelAnimationFrame(animationFrameId);
+            isDropping = false;
+        }
+        createPegsInternal();
+        resetBallInternal();
+    });
 }
 
-// --- Expose functions and variables for testing ---
-window.plinkoGameApi.getGameState = () => ({ // Provide a way to get current state
-    playerScore,
-    COST_TO_PLAY,
-    PEG_ROWS,
-    PEGS_PER_ROW_START,
-    PRIZE_VALUES,
-    pegs, // Direct access to the pegs array
-    isDropping,
-    ballX, ballY, ballVX, ballVY // For more advanced tests if needed
-});
-window.plinkoGameApi.setPlayerScore = (newScore) => { playerScore = newScore; }; // Allow setting score for tests
-window.plinkoGameApi.createPegs = createPegsInternal;
-window.plinkoGameApi.dropBall = dropBallInternal;
-window.plinkoGameApi.determinePrize = determinePrizeInternal; // Expose with ballX param
-window.plinkoGameApi.resetBall = resetBallInternal;
-window.plinkoGameApi.initGameForTest = () => { // Special init for tests that might not need full DOM
-    initializeDomReferences(); // Try to get real elements
-    // If boardElement is available, use its dimensions, otherwise use defaults
-    const testBoardWidth = boardElement ? boardElement.clientWidth : 500;
-    const testBoardHeight = boardElement ? boardElement.clientHeight : 400;
-
-    // Mock elements if not present for headless tests
-    if (!boardElement) {
-        boardElement = { clientWidth: testBoardWidth, clientHeight: testBoardHeight, innerHTML: '', appendChild: () => {} };
-    }
-    if (!ballElement) ballElement = { style: {} };
-    if (!scoreDisplay) scoreDisplay = { textContent: '' };
-    if (!messageDisplay) messageDisplay = { textContent: '', style: {} };
-    if (!dropButton) dropButton = { disabled: false, addEventListener: () => {} };
-
-    // createPegsInternal(); // Create pegs using potentially mocked boardElement
-    // resetBallInternal();
-    // updateScoreDisplayInternal();
-};
-
-
-// --- Game Initialization (only if not in a test-like environment or specifically called) ---
-if (typeof window !== 'undefined' && !window.isRunningTests) { // Avoid auto-running if in test runner
-    document.addEventListener('DOMContentLoaded', initGame);
-}
+document.addEventListener('DOMContentLoaded', initGame);
